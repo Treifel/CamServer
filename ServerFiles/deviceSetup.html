@@ -313,7 +313,8 @@
             }
 
             //websocket connection
-            var url = "ws://192.168.4.1:1337/" // standard esp url 
+            var url = "ws://" + "192.168.0.174" + ":1337/" // retrieve ESP host name 
+            debuglog(window.location.origin)
             var output
             var context
             wsConnected = false     //Connection flag

@@ -90,7 +90,7 @@ String scanWifi() {
 //########## WebSocket Handling ##########
 // Callback: recieving ws message
 void onWebSocketEvent(uint8_t client_num, WStype_t type, uint8_t *payload, size_t length) {
-  
+
   byte incoming[length];
   switch (type) {
     case WStype_DISCONNECTED:
@@ -272,10 +272,31 @@ void showEEPROM() {
 
 }
 
-void stepperTimeoutCheck(){
-  if (stamp + stepperTimeout <= millis()){
+void stepperTimeoutCheck() {
+  if (stamp + stepperTimeout <= millis()) {
     stepperOne.disable();
     stepperTwo.disable();
+  }
+}
+
+void tryWifi() {
+  String eepromSSID;
+  String eepromPASS;
+  int wifiTimeoutLimit = 10; //timeout in seconds
+  for (int i = 0; i < credentialCounter; i++) {
+
+    if (WiFi.status() != WL_CONNECTED) {
+      eepromSSID = prefs.getString("ssid");
+      eepromPASS = prefs.getString("pass");
+      WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str());
+
+      int timeStamp = millis() + wifiTimeoutLimit*1000;
+      Serial.print("Trying to connect to "); Serial.print(eepromSSID);
+      while ((WiFi.status() != WL_CONNECTED) && (timeStamp >= millis())) {
+         //if (millis() % 1000 == 0) Serial.print(" .");
+      }
+    }
+
   }
 }
 
@@ -283,21 +304,32 @@ void stepperTimeoutCheck(){
 void setup() {
   Serial.begin(115200);
 
+// ------------- WIFI Setup -------------
   //Check store wifi credentials
   prefs.begin("Credentials", false);
   showEEPROM();
-
-
-
-  if (!WiFi.softAP(ssid, password)) {
-    while (true) {
-      if ((millis() / 1000) % 2 == 0) Serial.println("SoftAP failiure!");
-    }
+  if (credentialCounter > 0) {
+    tryWifi();
   }
-  //initmDNS();
-  delay(2000);
-  Serial.print("AP running at "); Serial.println(WiFi.softAPIP());
 
+
+  if (WiFi.status() != WL_CONNECTED) { //if there is no working wifi start AP
+    if (!WiFi.softAP(ssid, password)) {
+      while (true) {
+        if ((millis() / 1000) % 2 == 0) Serial.println("SoftAP failiure!");
+      }
+    }
+    //initmDNS();
+    delay(2000);
+    Serial.print("AP running at "); Serial.println(WiFi.softAPIP());
+  }else{
+    Serial.print("ESP connected to "); Serial.print(WiFi.SSID()); Serial.print(" running on "); Serial.println(WiFi.localIP());
+  }
+
+  Serial.println("Starting website host and websocket communication");
+  //There must be a WiFi connection beyond this point (AP or Router)
+
+  // ------------- WebSocket and Server setup -------------
   server.on("/", HTTP_GET, onIndexRequest);
   server.onNotFound(onPageNotFound);
 
