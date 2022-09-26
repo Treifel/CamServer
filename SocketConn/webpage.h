@@ -31,7 +31,7 @@ R"=====(
 
             .input{
                 display: flex;
-                flex-direction: column;
+                flex-direction: row;
                 gap: 10px;
                 width: 50%;
             }
@@ -214,9 +214,21 @@ R"=====(
                     </div>
 
                     <div>
-                        <button id="submitButton">Submit</button>
+                        <button id="submitButtonWiFi">Submit</button>
                     </div>
 
+                </div>
+            </div>
+
+            <div class="rowStyle">
+                <div class="rowStyle">
+                    <lable for="staticIP"> Static IP: </lable> 
+                    <input type="text" id="staticIP">
+                    <label for="mDNSname"> mDNS name: </label>
+                    <input type="text" id="mDNSname">
+                </div>
+                <div>
+                    <button id="submitButtonMeta">Submit</button>
                 </div>
             </div>
 
@@ -317,7 +329,9 @@ R"=====(
             }
 
             //websocket connection
-            var url = "ws://" + "192.168.0.174" + ":1337/" // retrieve ESP host name 
+            var hostIP = self.location.host
+            debuglog(self.location.host)
+            var url = "ws://" + hostIP + ":1337/" // retrieve ESP host name 
             debuglog(window.location.origin)
             var output
             var context
@@ -361,6 +375,7 @@ R"=====(
                         3: reboot ESP
                         4: rotate cam
                         5: get stepper position
+                        6: send Wifi mDNS and static ip
                 */
                 debuglog("Recieved: " + event.data)
                 payload = evt.data.split(":")
@@ -411,7 +426,6 @@ R"=====(
             window.addEventListener("load", wsStart, false)
 
 
-
             //Response Functions
             function updateWifiBox(content){
                 listbox = document.getElementById('listBox') 
@@ -446,6 +460,15 @@ R"=====(
                 debuglog("SSID: " + ssid + ", Pass: " + pass)
                 message += ssid + "," + pass
                 debuglog("Message: " + message)
+                wsSend(message)
+            }
+
+            function sendWifiMeta(){
+                message = "6:"
+                mDNS = document.getElementById("mDNSname").value
+                ip = document.getElementById("staticIP").value
+                debuglog("staticIP: " + ip + ", mDNS: " + mDNS)
+                message += ip + "," + mDNS
                 wsSend(message)
             }
 
@@ -575,8 +598,17 @@ R"=====(
                 }
             }   
 
-            const submitButton = document.getElementById("submitButton")
-            submitButton.onclick = (event) =>{
+            
+
+            const submitButtonMeta = document.getElementById("submitButtonMeta")
+            submitButtonMeta.onclick = (event) =>{
+                if (wsConnected){
+                    sendWifiMeta()
+                } 
+            }
+
+            const submitButtonWifi = document.getElementById("submitButtonWiFi")
+            submitButtonWifi.onclick = (event) =>{
                 if (wsConnected){
                     sendWifiCredentials()
                 } 

@@ -9,26 +9,33 @@
 
 #define stepperTimeout 4000
 
-//Device Setup Constants
+//AP SSID and Pass
 const char *ssid = "ESP32 Setup";
 const char *password = "ESP32Setup";
-const char *msg_ssid;
-const char *msg_pass;
+
+
+//dns setup
+  const char *dnsName = "cam";
 const int dns_port = 53;
 const int http_port = 80;
 const int ws_port = 1337;
 int stamp;
 
-//Globals
+
+//Webserver init
 AsyncWebServer server(http_port);
 WebSocketsServer webSocket = WebSocketsServer(ws_port);
 Preferences prefs;
 char msg_buf(40);
 int credentialCounter;
 
-//Stepper Init
-StepperMaster stepperOne(16, 17, 18, 19); //Horizontal axis
-StepperMaster stepperTwo(27, 26, 25, 33); //Vertical axis
+//Static IP
+IPAddress local_IP(192, 168, 0, 181);
+
+
+//Stepper init
+StepperMaster stepperOne(16, 17, 18, 19);  //Horizontal axis
+StepperMaster stepperTwo(27, 26, 25, 33);  //Vertical axis
 Gimbal gimbal(&stepperOne, &stepperTwo, 900);
 
 
@@ -45,20 +52,15 @@ void gimbalTest() {
 /*########################## FUNCTIONS ##############################*/
 
 //mDNS
-void initmDNS()
-{
-  const char *dnsName = "camsetup";
-  if (MDNS.begin(dnsName))
-  {
+void initmDNS() {
+  if (MDNS.begin(dnsName)) {
     Serial.println("mDNS responder started");
-    Serial.print("My name is: ");
-    Serial.println(dnsName);
+    Serial.print("mDNS name: http://");
+    Serial.print(dnsName);
+    Serial.println(".local");
 
-  }
-  else
-  {
-    while (1)
-    {
+  } else {
+    while (1) {
       Serial.println("Error setting up MDNS responder");
       delay(1000);
     }
@@ -94,19 +96,26 @@ void onWebSocketEvent(uint8_t client_num, WStype_t type, uint8_t *payload, size_
   byte incoming[length];
   switch (type) {
     case WStype_DISCONNECTED:
-      Serial.print("["); Serial.print(client_num); Serial.println("] Disconnected!");
+      Serial.print("[");
+      Serial.print(client_num);
+      Serial.println("] Disconnected!");
       Serial.println("------------ Protocol Log End ------------");
       break;
     case WStype_CONNECTED:
       {
         IPAddress ip = webSocket.remoteIP(client_num);
-        Serial.print("Client ["); Serial.print(client_num); Serial.print("] connecting with "); Serial.println(ip.toString());
+        Serial.print("Client [");
+        Serial.print(client_num);
+        Serial.print("] connecting with ");
+        Serial.println(ip.toString());
         Serial.println("------------ Protocol Log Start ------------");
       }
       break;
     case WStype_TEXT:
 
-      Serial.print("\n["); Serial.print(client_num); Serial.print("] sent message! ");
+      Serial.print("\n[");
+      Serial.print(client_num);
+      Serial.print("] sent message! ");
       for (int i = 0; i < length; i++) {
         incoming[i] = payload[i];
       }
@@ -119,7 +128,8 @@ void onWebSocketEvent(uint8_t client_num, WStype_t type, uint8_t *payload, size_
       Serial.println("Unknown ERROR");
       break;
     default:
-      Serial.print("Unknown: "); Serial.println(String(type));
+      Serial.print("Unknown: ");
+      Serial.println(String(type));
       break;
   }
 }
@@ -127,14 +137,20 @@ void onWebSocketEvent(uint8_t client_num, WStype_t type, uint8_t *payload, size_
 //Callback send homepage
 void onIndexRequest(AsyncWebServerRequest *request) {
   IPAddress remote_ip = request->client()->remoteIP();
-  Serial.print("[");  Serial.print(String(remote_ip)); Serial.print("] HTTP GET request of "); Serial.println(request->url());
+  Serial.print("[");
+  Serial.print(String(remote_ip));
+  Serial.print("] HTTP GET request of ");
+  Serial.println(request->url());
   request->send(200, "text/html", webpageCode);
 }
 
 //Callback not found
 void onPageNotFound(AsyncWebServerRequest *request) {
   IPAddress remote_ip = request->client()->remoteIP();
-  Serial.print("["); Serial.print(String(remote_ip)); Serial.print("] HTTP GET request of "); Serial.println(request->url());
+  Serial.print("[");
+  Serial.print(String(remote_ip));
+  Serial.print("] HTTP GET request of ");
+  Serial.println(request->url());
   request->send(404, "text/plan", "Page not found!\n    404");
 }
 
@@ -157,9 +173,10 @@ void respond(byte *payload, int length) {
   String wsPASS;
   int count = 0;
 
-  //Serial.print("Command: "); Serial.print(cmd);
+  Serial.print("Command: ");
+  Serial.print(cmd);
   switch (cmd) {
-    case '0': //Return wifi Signals in Range
+    case '0':  //Return wifi Signals in Range
       Serial.println(" (return wifi signals)");
       response = "0:";
       response += scanWifi();
@@ -167,7 +184,7 @@ void respond(byte *payload, int length) {
       Serial.println(response);
       break;
 
-    case '1': //Store incoming SSID and password
+    case '1':  //Store incoming SSID and password
       {
         //Serial.println(" (Store ssid and password)");
         bool next = false;
@@ -185,7 +202,7 @@ void respond(byte *payload, int length) {
       }
       break;
 
-    case '2': //clear stored wifi credentials
+    case '2':  //clear stored wifi credentials
       Serial.println(" (clear stored wifi credentials)");
       prefs.clear();
       prefs.putUInt("counter", 0);
@@ -206,7 +223,7 @@ void respond(byte *payload, int length) {
       for (int i = 2; i < length; i++) {
         //Serial.print(char(payload[i]));
         if (char(payload[i]) == ',') {
-          count++; //check for
+          count++;  //check for
         } else {
           switch (count) {
             case 0:
@@ -229,21 +246,21 @@ void respond(byte *payload, int length) {
       //Serial.print("Rotating to X: "); Serial.print(px.toFloat()); Serial.print(", Y: "); Serial.print(py.toFloat()); Serial.println(".");
       gimbal.rotateTo(py.toFloat(), px.toFloat(), vel.toFloat());
       response = "4:";
-      response += px.toFloat(); //get vertical axis Value (x)
+      response += px.toFloat();  //get vertical axis Value (x)
       response += ",";
-      response += py.toFloat(); //get horizontal axis Value (y)
+      response += py.toFloat();  //get horizontal axis Value (y)
       webSocket.sendTXT(0, response);
 
       break;
     case '5':
       Serial.println(" (return stepper positions)");
       response = "5:";
-      response += stepperTwo.getAbsoluteAngle(); //get horizontal axis Value (x)
+      response += stepperTwo.getAbsoluteAngle();  //get horizontal axis Value (x)
       response += ",";
-      response += stepperOne.getAbsoluteAngle(); //get vertical axis Value (y)
+      response += stepperOne.getAbsoluteAngle();  //get vertical axis Value (y)
       webSocket.sendTXT(0, response);
       break;
-    default: //command could not be recognized
+    default:  //command could not be recognized
       Serial.println("(Unknown command!)");
       webSocket.sendTXT(0, "100:Unkown Command");
       break;
@@ -257,19 +274,23 @@ bool storeCreds(String ssid, String pass) {
   prefs.putUInt("counter", temp);
 }
 
-
 void showEEPROM() {
   credentialCounter = prefs.getUInt("counter", 0);
   if (credentialCounter > 0) {
-    Serial.print("Found "); Serial.print(credentialCounter); Serial.println(" stored WiFi Credentials:");
+    Serial.print("Found ");
+    Serial.print(credentialCounter);
+    Serial.println(" stored WiFi Credentials:");
     String eepromSSID = prefs.getString("ssid");
     String eepromPASS = prefs.getString("pass");
-    Serial.print("SSID: "); Serial.println(eepromSSID);
-    Serial.print("Pass: "); Serial.println(eepromPASS);
+    Serial.print("SSID: ");
+    Serial.println(eepromSSID);
+    Serial.print("Pass: ");
+    Serial.println(eepromPASS);
   } else {
-    Serial.print("Found "); Serial.print(credentialCounter); Serial.println(" stored WiFi Credentials");
+    Serial.print("Found ");
+    Serial.print(credentialCounter);
+    Serial.println(" stored WiFi Credentials");
   }
-
 }
 
 void stepperTimeoutCheck() {
@@ -279,24 +300,82 @@ void stepperTimeoutCheck() {
   }
 }
 
+
+bool staticIPSetup() {
+
+
+  // Default 
+  IPAddress gateway;
+
+  IPAddress subnet;
+  IPAddress primaryDNS;  // optional
+  IPAddress secondaryDNS;    // optional
+
+  String eepromSSID = prefs.getString("ssid");
+  String eepromPASS = prefs.getString("pass");
+
+  Serial.println("Fetching WiFi data to setup static IP...");
+
+  //Serial.print("Local IP: ");
+  Serial.print(local_IP); Serial.print(":"); Serial.println(ws_port);
+  delay(50);
+
+
+  //Serial.print("Subnet Mask: ");
+  subnet = WiFi.subnetMask();
+  //Serial.println(subnet);
+
+  //Serial.print("Gateway IP: ");
+  gateway = WiFi.gatewayIP();
+  //Serial.println(gateway);
+
+  //Serial.print("DNS 1: ");
+  primaryDNS = WiFi.dnsIP(0);
+  //Serial.println(primaryDNS);
+
+  //Serial.print("DNS 2: ");
+  secondaryDNS = WiFi.dnsIP(2);
+  //Serial.println(secondaryDNS);
+
+  //Restart WiFi with static ip
+  WiFi.disconnect();
+  delay(200);
+  WiFi.mode(WIFI_STA);
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.println("STA Failed to configure");
+  }
+  delay(500);
+  WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str());  //conenct to WiFi with static IP
+  while (WiFi.status() != WL_CONNECTED) {
+
+
+    //Serial.println(WiFi.status());
+  }
+
+  return true;
+}
+
+//connecting to wifi with timeout
 void tryWifi() {
   String eepromSSID;
   String eepromPASS;
-  int wifiTimeoutLimit = 10; //timeout in seconds
+  int wifiTimeoutLimit = 10;  //timeout in seconds
   for (int i = 0; i < credentialCounter; i++) {
 
     if (WiFi.status() != WL_CONNECTED) {
       eepromSSID = prefs.getString("ssid");
       eepromPASS = prefs.getString("pass");
-      WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str());
+      WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str());  //start with dynamic IP
 
-      int timeStamp = millis() + wifiTimeoutLimit*1000;
-      Serial.print("Trying to connect to "); Serial.print(eepromSSID);
+      int timeStamp = millis() + wifiTimeoutLimit * 1000;
       while ((WiFi.status() != WL_CONNECTED) && (timeStamp >= millis())) {
-         //if (millis() % 1000 == 0) Serial.print(" .");
+        // Serial.print(WiFi.status()); Serial.print(": "); Serial.print(timeStamp); Serial.print(" >= "); Serial.println(millis());
+        //Serial.println(WiFi.status());//Serial.print(" .");
       }
     }
 
+    //set up static IP
+    staticIPSetup();
   }
 }
 
@@ -304,7 +383,6 @@ void tryWifi() {
 void setup() {
   Serial.begin(115200);
 
-// ------------- WIFI Setup -------------
   //Check store wifi credentials
   prefs.begin("Credentials", false);
   showEEPROM();
@@ -312,24 +390,29 @@ void setup() {
     tryWifi();
   }
 
-
-  if (WiFi.status() != WL_CONNECTED) { //if there is no working wifi start AP
+  //if there is no working wifi start AP
+  if (WiFi.status() != WL_CONNECTED) {
     if (!WiFi.softAP(ssid, password)) {
       while (true) {
         if ((millis() / 1000) % 2 == 0) Serial.println("SoftAP failiure!");
       }
     }
-    //initmDNS();
     delay(2000);
-    Serial.print("AP running at "); Serial.println(WiFi.softAPIP());
-  }else{
-    Serial.print("ESP connected to "); Serial.print(WiFi.SSID()); Serial.print(" running on "); Serial.println(WiFi.localIP());
+    Serial.print("AP running at ");
+    Serial.println(WiFi.softAPIP());
+  } else {
+    Serial.print("ESP connected to ");
+    Serial.print(WiFi.SSID());
+    Serial.print(" running on ");
+    Serial.println(WiFi.localIP());
   }
 
-  Serial.println("Starting website host and websocket communication");
-  //There must be a WiFi connection beyond this point (AP or Router)
+  //setting up DNS Name to connect
+  initmDNS();
 
-  // ------------- WebSocket and Server setup -------------
+  Serial.println("Starting website host and websocket communication");
+
+  //There must be a WiFi connection beyond this point (AP or Router)
   server.on("/", HTTP_GET, onIndexRequest);
   server.onNotFound(onPageNotFound);
 
