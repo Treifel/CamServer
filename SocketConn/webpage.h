@@ -8,7 +8,7 @@ R"=====(
         <title>
             ESP32 Device Setup
         </title>
-<!--####################################################  CSS  ####################################################-->
+        <!--####################################################  CSS  ####################################################-->
         <style>
             body{
                 font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif
@@ -17,9 +17,10 @@ R"=====(
                 display: flex;
                 flex-direction: row;
                 justify-content: left;
-                gap: 5%;
+                gap: 1em;
                 padding: 2px;
                 margin-bottom: 5ex;
+                white-space: nowrap;
             }
             
             .columnStyle{
@@ -55,10 +56,11 @@ R"=====(
             }
 
             .PageButton{
+                height: 1em;
                 border: 2px solid black;
                 border-radius: 5px; 
                 text-align: center; 
-                padding: 1em;
+                padding: 0.8em;
             }
 
             .PageButton:hover{
@@ -179,8 +181,8 @@ R"=====(
         </style>
     </head>
 
-    <!--####################################################  HTML  ####################################################-->
-    <body>
+    <body> 
+        <!--####################################################  HTML  ####################################################-->
         
         <div id="setupPage" class="columnStyle" style="display: none;"> <!-- ---------------------------- setupPage ---------------------------- -->
             <h1>
@@ -202,7 +204,7 @@ R"=====(
 
                 <div class="columnStyle">
                     Please enter or select Wifi and add the corresponding password.
-                    <div class="input">
+                    <div class="columnStyle">
                         <lable for="ssid"> SSID: </lable> 
                         <input type="text" id="ssid">
                         <label for="password"> Password: </label>
@@ -216,20 +218,19 @@ R"=====(
                     <div>
                         <button id="submitButtonWiFi">Submit</button>
                     </div>
-
                 </div>
+                <a href="#" onclick="return show('indexPage','setupPage');" class="PageButton">Camera control</a>
             </div>
 
             <div class="rowStyle">
-                <div class="rowStyle">
+                <div class="columnStyle">
                     <lable for="staticIP"> Static IP: </lable> 
                     <input type="text" id="staticIP">
                     <label for="mDNSname"> mDNS name: </label>
                     <input type="text" id="mDNSname">
                 </div>
-                <div>
                     <button id="submitButtonMeta">Submit</button>
-                </div>
+                
             </div>
 
             <div class="rowStyle">
@@ -245,7 +246,6 @@ R"=====(
             </div>
            
 
-            <a href="#" onclick="return show('indexPage','setupPage');" class="PageButton">Camera control</a>
         </div> 
 
 
@@ -259,9 +259,9 @@ R"=====(
             <div class="rowStyle">
 
                 <div class="columnStyle">
-                    Available ESP cams in network
-                    <select id="espBox" size="10"></select>
-                    <button id="refreshESP">Refresh</button>
+                    Camera Positions
+                    <select id="favPosBox" size="10" style="width: 20em;"></select>
+                    <button id="rotateFavPosButton">Rotate to Pos</button>
                 </div>
 
                 <div class="columnStyle">
@@ -279,22 +279,21 @@ R"=====(
 
                 <div class="columnStyle">
 
-                    <a href="#" onclick="return show('setupPage','indexPage');" class="PageButton">Settings</a>
-
                     <div class="rowStyle">
                         <span> PosX:</span> 
-                        <input type="number" id="PosX" max="6">
+                        <input type="text" id="PosX" max="6">
                     </div>
                     
                     <div class="rowStyle">
                         <span> PosY:</span> 
-                        <input type="number" id="PosY" step="0.01">
+                        <input type="text" id="PosY" step="0.01">
                     </div> 
                     <button id="rotateTo">Rotate to</button>
                     <button id="setZero">Set Zero</button>
                     
                 </div>
 
+                <a href="#" onclick="return show('setupPage','indexPage');" class="PageButton">Settings</a>
             </div>
 
             <div class="rowStyle"> 
@@ -305,15 +304,17 @@ R"=====(
         </div>
         
 
-        <div id="toast">This is an Emergency Toast Test.</div>
+        <div id="toast">Toast</div>
 
 
         <!--//####################################################  JavaScript  ####################################################-->
         <script>
 
             
-            //DEBUG LOG function
+            // -------- Debug Log --------
+            //DEBUG LOG put TRUE
             debug = true
+            // -------- Debug Log --------
             function debuglog(message){
                 if (debug) console.log(message)
             }
@@ -328,8 +329,9 @@ R"=====(
                 }, time)
             }
 
+
             //websocket connection
-            var hostIP = self.location.host
+            var hostIP = self.location.host //get IP address of ESP Host
             debuglog(self.location.host)
             var url = "ws://" + hostIP + ":1337/" // retrieve ESP host name 
             debuglog(window.location.origin)
@@ -376,36 +378,53 @@ R"=====(
                         4: rotate cam
                         5: get stepper position
                         6: send Wifi mDNS and static ip
+                        7: get fav pos coords
                 */
                 debuglog("Recieved: " + event.data)
                 payload = evt.data.split(":")
                 cmd = payload[0]
+                var type = typeof cmd;
+                debuglog("CMD; type: " + type + ", cmd: " + cmd)
                 content = payload[1]
                 switch(cmd){
                     case "0":             
                         updateWifiBox(content)
                         wsSend("5:StepperPos")
                         break;
-                    case "1":
-                        
-                        showToast("Data succesfully stored", 2000)
 
+                    case "1":
+                        showToast("Data succesfully stored", 2000)
                         break;
+
                     case "2":
                         showToast("Data succesfully erased", 2000)
-
                         break;
+
                     case "3":
                         showToast("Rebooting ESP", 2000)
                         break;
+
                     case "4":
                         var pos = content.split(",")
-                        updatePos(parseFloat(pos[0]), parseFloat(pos[1]))
+                        updatePos(parseFloat(pos[0]), parseFloat(pos[1]));
                         break;
+
                     case "5":
                         var pos = content.split(",");
-                        updatePos(parseFloat(pos[0]), parseFloat(pos[1]))
+                        updatePos(parseFloat(pos[0]), parseFloat(pos[1]));
                         break;
+
+                    case "6":
+                        showToast("Data succesfully stored", 2000)
+                        debuglog("store succesful")
+                        break;
+
+                    case "7":
+                        var pos = content.split(",");
+                        updatePos(parseFloat(pos[0]), parseFloat(pos[1]));
+                        requestRotate(-1);
+                        break;
+
                     default:
                         debuglog("ERROR interpreting message")
                         break;
@@ -436,17 +455,17 @@ R"=====(
 
                 for (var j = 0; j < availableNetworks.length; j++){
                     network = availableNetworks[j]
-                        debuglog("Checking network " + network)
-                    debuglog("Listbox length: " + listboxLength)
+                    //debuglog("Checking network " + network)
+                    //debuglog("Listbox length: " + listboxLength)
 
                     for (var i = 0; i < listboxLength; i++){
                         if (listbox.options[i].text == network){ //check if network is already contained in LB
                            addContent = false
-                           debuglog(network + " is already in the listbox ")
+                           //debuglog(network + " is already in the listbox ")
                         }
                     }
                     if (addContent){
-                        debuglog("Adding " + network)
+                        //debuglog("Adding " + network)
                         listbox.options[listboxLength] = new Option(network)
                         listboxLength++;
                     }
@@ -467,9 +486,21 @@ R"=====(
                 message = "6:"
                 mDNS = document.getElementById("mDNSname").value
                 ip = document.getElementById("staticIP").value
+                //Check ip for validity
+                const mask = /((^|\.)((25[0-5])|(2[0-4]\d)|(1\d\d)|([1-9]?\d))){4}$/ //regex mask
+                var match = mask.test(ip)
+                debuglog(typeof(match));
+                if (match == true){
+                    message += ip + "," + mDNS;
+                    wsSend(message)
+                } else {
+                    showToast("Invalid IP Address!", 3000)
+                }
+
+                /*
                 debuglog("staticIP: " + ip + ", mDNS: " + mDNS)
                 message += ip + "," + mDNS
-                wsSend(message)
+                wsSend(message)*/
             }
 
             function showLoader(show){
@@ -484,6 +515,7 @@ R"=====(
             }
 
             function updatePos(posx, posy){
+                debuglog("updating pos")
                 document.getElementById("PosX").value = posx;
                 document.getElementById("PosY").value = posy;
             }
@@ -509,6 +541,7 @@ R"=====(
                         y = y - 1;
                         debuglog("down")
                         break;
+                        
                 }
                 if(wsConnected){
                     wsSend("4:" + x + "," + y + ",12")
@@ -534,35 +567,33 @@ R"=====(
                 keyReleased()
             });
 
-            //catching keyButton event
-
-
-
-            //
+            //catching keyButton events
             function keyPressed(keyCode){
                 var keyspan = document.getElementById("keyCode")
                 if(keyCode == 37) {
-                    keyspan.textContent="Key pressed: Left"
+                    keyspan.textContent="Key pressed: Left";
                 }
                 else if(keyCode == 38) {
-                    keyspan.textContent="Key pressed: Up"
+                    keyspan.textContent="Key pressed: Up";
                 }
                 else if(keyCode == 39) {
-                    keyspan.textContent="Key pressed: Right"
+                    keyspan.textContent="Key pressed: Right";
                 }
                 else if(keyCode == 40) {
-                    keyspan.textContent="Key pressed: Down"
+                    keyspan.textContent="Key pressed: Down";
                 }
-                requestRotate(keyCode)
+                if (keyCode >= 37 && keyCode <= 40) requestRotate(keyCode);
+                
             }
 
             function keyReleased(){
-                keyspan = document.getElementById("keyCode")
-                keyspan.textContent="Key pressed:"
+                keyspan = document.getElementById("keyCode");
+                keyspan.textContent="Key pressed:";
             }
 
             //listbox events
-            const lb = document.getElementById("listBox")
+            const lb = document.getElementById("listBox");
+            const favPosBox = document.getElementById("favPosBox");
 
             lb.onclick = (event) =>{
                 ssid.value = lb.value;
@@ -598,13 +629,11 @@ R"=====(
                 }
             }   
 
-            
-
             const submitButtonMeta = document.getElementById("submitButtonMeta")
             submitButtonMeta.onclick = (event) =>{
-                if (wsConnected){
+                //if (wsConnected){
                     sendWifiMeta()
-                } 
+                //} 
             }
 
             const submitButtonWifi = document.getElementById("submitButtonWiFi")
@@ -625,6 +654,14 @@ R"=====(
             const rotateToButton = document.getElementById("rotateTo")
             rotateToButton.onclick = (event) => {
                 requestRotate(-1)
+            }
+
+            const favPosButton = document.getElementById("rotateFavPosButton")
+            favPosButton.onclick = (event) => {
+                //request coordinates for fav Pos
+                var posName = favPosBox.value
+                if (posName != null)
+                wsSend("6:" + posName)
             }
 
 
