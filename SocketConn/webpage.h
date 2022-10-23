@@ -13,10 +13,23 @@ R"=====(
             body{
                 font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif
             }
+
+            input, label{
+                display: inline-block;
+                vertical-align: middle;
+            }
+            label{
+                min-width: 10em;
+            }
+            input{
+                min-width: 5em;
+            }
+
             .rowStyle{
                 display: flex;
                 flex-direction: row;
                 justify-content: left;
+                align-items: stretch;
                 gap: 1em;
                 padding: 2px;
                 margin-bottom: 5ex;
@@ -26,7 +39,8 @@ R"=====(
             .columnStyle{
                 display: flex;
                 flex-direction: column;
-                justify-content: space-between;
+                align-items: stretch;
+                justify-content: start;
                 gap: 5px;
             }
 
@@ -56,10 +70,13 @@ R"=====(
             }
 
             .PageButton{
+                
+                display: flex;
                 height: 1em;
                 border: 2px solid black;
                 border-radius: 5px; 
-                text-align: center; 
+                align-items: center;
+                justify-content: center;
                 padding: 0.8em;
             }
 
@@ -70,20 +87,23 @@ R"=====(
             .PageButton:active{
                 border-color: lightgrey;
             }
-            .grid-container{
+            .grid-container-arrowkeys{
                 display: grid;
                 grid-template-columns: 4em 4em 4em;
                 grid-template-rows: 4em 4em;
-                gap: 10px;
+                gap: 1em;
             }
 
             .keyButton{
-                display: table-cell;
-                vertical-align: middle;
-                border: 1px solid rgb(54, 54, 54);
+                font-family: sans-serif;
+                font-size: 2em;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border: 2px solid rgb(54, 54, 54);
                 border-radius: 5px;
-                background-color: grey;
-                text-align: center;
+                background-color: beige;
+                margin-top: 0em;
 
 
                 -moz-user-select: none; /* Old versions of Firefox */
@@ -97,7 +117,7 @@ R"=====(
             }
 
             .keyButton:hover{
-                background-color: lightgray;
+                background-color: darkgrey;
                 cursor: pointer;
             }
 
@@ -106,23 +126,22 @@ R"=====(
             }
 
 
-            #item1 {
+            #arrowLeft {
                 grid-column: 1;
                 grid-row: 2;
             }
-            #item2 {
+            #arrowUp {
                 grid-column: 2;
                 grid-row: 1;
             }
-            #item3 {
+            #arrowRight {
                 grid-column: 3;
                 grid-row: 2;
             }
-            #item4 {
+            #arrowDown {
                 grid-column: 2;
                 grid-row: 2;
             }
-
 
             #toast {
                 visibility: hidden;
@@ -152,7 +171,7 @@ R"=====(
             input[type=number]::-webkit-inner-spin-button {
                 width: 20px;
                 color: #3498db;
-                -webkit-appearance: none;
+                
             }
 
 
@@ -176,7 +195,7 @@ R"=====(
             /* selected link */
             a:active {
             color: grey;
-            }
+            } 
 
         </style>
     </head>
@@ -185,9 +204,13 @@ R"=====(
         <!--####################################################  HTML  ####################################################-->
         
         <div id="setupPage" class="columnStyle" style="display: none;"> <!-- ---------------------------- setupPage ---------------------------- -->
-            <h1>
-                ESP32 Cam Controller - Device Setup
-            </h1>
+            <div class="rowStyle" style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>
+                    ESP32 Cam Controller - Device Setup
+                </h1>
+                <a href="#" onclick="return show('indexPage','setupPage');" 
+                    class="PageButton">Camera control</a>
+            </div>  
             <div class="rowStyle">
                 
                 <div class="columnStyle">
@@ -215,91 +238,114 @@ R"=====(
                         </div>
                     </div>
 
+                    
                     <div>
                         <button id="submitButtonWiFi">Submit</button>
                     </div>
+                    
                 </div>
-                <a href="#" onclick="return show('indexPage','setupPage');" class="PageButton">Camera control</a>
-            </div>
 
-            <div class="rowStyle">
                 <div class="columnStyle">
+                    Wifi meta Settings
                     <lable for="staticIP"> Static IP: </lable> 
                     <input type="text" id="staticIP">
                     <label for="mDNSname"> mDNS name: </label>
                     <input type="text" id="mDNSname">
-                </div>
-                    <button id="submitButtonMeta">Submit</button>
-                
-            </div>
-
-            <div class="rowStyle">
-                <div class="rowStyle">
-                    <span>Clear stored Wifi data:</span>
-                    <button id="resetEEPROM"> Clear </button>
-                </div>
-    
-                <div class="rowStyle">
-                    <span>Restart ESP:</span>
-                    <button id="restartESP">Restart</button>
+                    <button id="submitButtonMeta" style="max-height: 2em; position: relative; height: 50%;" >Submit</button>
                 </div>
             </div>
-           
 
+
+
+
+            <div class="columnStyle" >
+                    <div>
+                        <label style="margin: 10px 0;">Clear stored Wifi data:</label>
+                        <input type="button" value="Clear" id="clearWifiButton" style="margin: 10px 0;">
+                    </div>
+                    <div>
+                        <label style="margin: 10px 0;">Clear static IP:</label>
+                        <input type="button" value="Clear" id="clearStaticIPButton" style="margin: 10px 0;">
+                    </div>
+                    <div>
+                        <label style="margin: 10px 0;">Clear mDNS name:</label>
+                        <input type="button" value="Clear" id="clearmDNSButton" style="margin: 10px 0;">
+                    </div>
+                    <div>
+                        <label style="margin: 10px 0;">ESP32 factory reset:</label>
+                        <input type="button" value="Reset"  id="factoryResetButton" style="margin: 10px 0;">
+                    </div>
+                    <div>
+                        <label style="margin: 10px 0;">Restart ESP:</label>
+                        <input type="button" value="Restart"  id="restartESPButton" style="margin: 10px 0;">
+                    </div>
+                    
+            </div>
+            
         </div> 
 
 
 
 
         <div id="indexPage" style="display: visible;"> <!-- ---------------------------- indexPage ---------------------------- -->
-
-            <h1>
-                ESP32 Cam Controller - Home
-            </h1>
+            <div class="rowStyle" style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>
+                    ESP32 Cam Controller - Home
+                </h1>
+                <a href="#" onclick="return show('setupPage','indexPage');" class="PageButton">Settings</a>
+            </div>
             <div class="rowStyle">
 
                 <div class="columnStyle">
                     Camera Positions
                     <select id="favPosBox" size="10" style="width: 20em;"></select>
+                    <button id="removeFavPosButton">Remove selected position</button>
                     <button id="rotateFavPosButton">Rotate to Pos</button>
                 </div>
 
                 <div class="columnStyle">
-                    <span id="chosenESP">Choose ESP from list</span>
+                    <span id="camControl">Camera control</span>
 
-                    <div class="grid-container">
-                        <div id="item1" class="keyButton" onmousedown="keyPressed(37)" onmouseup="keyReleased()">&larr;</div>    
-                        <div id="item2" class="keyButton" onmousedown="keyPressed(38)" onmouseup="keyReleased()">&uarr;</div>    
-                        <div id="item3" class="keyButton" onmousedown="keyPressed(39)" onmouseup="keyReleased()">&rarr;</div>    
-                        <div id="item4" class="keyButton" onmousedown="keyPressed(40)" onmouseup="keyReleased()">&darr;</div>    
+                    <div class="grid-container-arrowkeys">
+                        <div id="arrowLeft" class="keyButton" onmousedown="keyPressed(37)" onmouseup="keyReleased()"><span>&larr;</span></div>    
+                        <div id="arrowUp" class="keyButton" onmousedown="keyPressed(38)" onmouseup="keyReleased()"><span>&uarr;</span></div>    
+                        <div id="arrowRight" class="keyButton" onmousedown="keyPressed(39)" onmouseup="keyReleased()"><span>&rarr;</span></div>    
+                        <div id="arrowDown" class="keyButton" onmousedown="keyPressed(40)" onmouseup="keyReleased()"><span>&darr;</span></div>    
                     </div>
-                    
+                    <div>
+                        <span> Step:</span> 
+                        <input type="number" id="stepInput" value="1">
+                    </div>
 
                 </div>
 
                 <div class="columnStyle">
-
+                    <span id="camPos">Camera angle</span>
                     <div class="rowStyle">
-                        <span> PosX:</span> 
-                        <input type="text" id="PosX" max="6">
+                        <span style="min-width: 5em;">Horizontal:</span> 
+                        <input type="text" id="hor">
                     </div>
                     
                     <div class="rowStyle">
-                        <span> PosY:</span> 
-                        <input type="text" id="PosY" step="0.01">
+                        <span style="min-width: 5em;">Vertical:</span> 
+                        <input type="text" id="ver">
                     </div> 
+
+                    <div class="rowStyle">
+                        <span style="min-width: 5em;">Speed:</span> 
+                        <input type="text" id="speed">
+                    </div> 
+
                     <button id="rotateTo">Rotate to</button>
-                    <button id="setZero">Set Zero</button>
+                    <button id="addFavPosButton">Add current position</button>
+                    <button id="setZeroButton">Set Zero</button>
                     
                 </div>
-
-                <a href="#" onclick="return show('setupPage','indexPage');" class="PageButton">Settings</a>
             </div>
 
             <div class="rowStyle"> 
                 <span id="keyCode"> Key pressed: </span>
             </div>
-
             
         </div>
         
@@ -309,7 +355,8 @@ R"=====(
 
         <!--//####################################################  JavaScript  ####################################################-->
         <script>
-
+            //Position x = horizontal axis
+            //Position y = vertical axis
             
             // -------- Debug Log --------
             //DEBUG LOG put TRUE
@@ -345,14 +392,21 @@ R"=====(
 
             function wsConnect(url){
                 debuglog("Trying to connect to " + url)
-                websocket = new WebSocket(url)
+                var available = true
+                try{
+                    websocket = new WebSocket(url)
+                }catch (error){
+                    available = false
+                    debuglog("Websocket failed: " + error)
+                }
 
                 //assign callbacks
-                websocket.onopen = function(evt) { onOpen(evt) }
-                websocket.onclose = function(evt) { onClose(evt) }
-                websocket.onmessage = function(evt) { onMessage(evt) }
-                websocket.onError = function(evt) { onError(evt) }
-
+                if (available){
+                    websocket.onopen = function(evt) { onOpen(evt) }
+                    websocket.onclose = function(evt) { onClose(evt) }
+                    websocket.onmessage = function(evt) { onMessage(evt) }
+                    websocket.onError = function(evt) { onError(evt) }
+                }
             }
 
             function onOpen(evt){
@@ -361,6 +415,7 @@ R"=====(
                 wsConnected = true
                 showToast("ESP connection established!", 2000)
                 wsSend("0:connected")
+                wsSend("4:0,"); //get stepper Postion
             }
 
             function onClose(evt){
@@ -371,14 +426,14 @@ R"=====(
             }
 
             function onMessage(evt){
-                /*      0: recieve available wifi networks
-                        1: store ssid and pass
-                        2: clear EEPROM
-                        3: reboot ESP
-                        4: rotate cam
-                        5: get stepper position
-                        6: send Wifi mDNS and static ip
-                        7: get fav pos coords
+                /*      
+                    Protcol format: cmd:[val],[val],....
+                    Protocol cmdset:
+                    0: recieve available wifi networks and StepperPos
+                    1: EEPROM Request
+                    2: reboot ESP
+                    3: rotate cam
+                    4: get/set stepper position
                 */
                 debuglog("Recieved: " + event.data)
                 payload = evt.data.split(":")
@@ -389,40 +444,31 @@ R"=====(
                 switch(cmd){
                     case "0":             
                         updateWifiBox(content)
-                        wsSend("5:StepperPos")
+                        wsSend("4:StepperPos")
                         break;
 
                     case "1":
+                        var data = payload.split(',');
+                        var dataID = data[0];
+                        var instructions = data[1];
+                        if ((dataID == 2) && (instructions == 2)){
+                            updateFavBoxMap(data);
+                        }
                         showToast("Data succesfully stored", 2000)
                         break;
 
                     case "2":
-                        showToast("Data succesfully erased", 2000)
-                        break;
-
-                    case "3":
                         showToast("Rebooting ESP", 2000)
                         break;
 
-                    case "4":
+                    case "3":
                         var pos = content.split(",")
                         updatePos(parseFloat(pos[0]), parseFloat(pos[1]));
                         break;
 
-                    case "5":
+                    case "4":
                         var pos = content.split(",");
                         updatePos(parseFloat(pos[0]), parseFloat(pos[1]));
-                        break;
-
-                    case "6":
-                        showToast("Data succesfully stored", 2000)
-                        debuglog("store succesful")
-                        break;
-
-                    case "7":
-                        var pos = content.split(",");
-                        updatePos(parseFloat(pos[0]), parseFloat(pos[1]));
-                        requestRotate(-1);
                         break;
 
                     default:
@@ -438,16 +484,17 @@ R"=====(
             }
 
             function wsSend(message){
-                debuglog("Sending: " + message)
-                websocket.send(message)
+                if (wsConnected){
+                    debuglog("Sending: " + message)
+                    websocket.send(message)
+                }else{
+                    debuglog("No Connection")
+                }
             }
-
-            window.addEventListener("load", wsStart, false)
-
 
             //Response Functions
             function updateWifiBox(content){
-                listbox = document.getElementById('listBox') 
+                networkListBox = document.getElementById('listBox') 
                 availableNetworks = content.split(",")
                 listboxLength = listbox.length
                 addContent = true
@@ -466,14 +513,14 @@ R"=====(
                     }
                     if (addContent){
                         //debuglog("Adding " + network)
-                        listbox.options[listboxLength] = new Option(network)
+                        networkListBox.options[listboxLength] = new Option(network)
                         listboxLength++;
                     }
                 }
             }
             
             function sendWifiCredentials(){
-                message = "1:"
+                message = "1:0,1,"
                 ssid = document.getElementById("ssid").value
                 pass = document.getElementById("password").value
                 debuglog("SSID: " + ssid + ", Pass: " + pass)
@@ -483,7 +530,7 @@ R"=====(
             }
 
             function sendWifiMeta(){
-                message = "6:"
+                message = "1:1,1,"
                 mDNS = document.getElementById("mDNSname").value
                 ip = document.getElementById("staticIP").value
                 //Check ip for validity
@@ -514,43 +561,41 @@ R"=====(
                 }
             }
 
-            function updatePos(posx, posy){
+            function updatePos(hor, ver){
                 debuglog("updating pos")
-                document.getElementById("PosX").value = posx;
-                document.getElementById("PosY").value = posy;
+                document.getElementById("hor").value = hor;
+                document.getElementById("ver").value = ver;
             }
             
             function requestRotate(keyCode){
-                var x = parseFloat(document.getElementById("PosX").value)
-                var y = parseFloat(document.getElementById("PosY").value)
+                var hor = Math.round(parseFloat(document.getElementById("hor").value, 2))
+                var ver = Math.round(parseFloat(document.getElementById("ver").value, 2))
+                var step = Math.round(parseFloat(document.getElementById("stepInput").value, 2))
 
-                switch (keyCode){
-                    case 37: //left
-                        debuglog("left")
-                        x = x-1;
+                switch (keyCode){ //key was pressed remove or add amount to Position
+                    case 37: //left -> Vertical axis 
+                        ver = ver + step;
+                        break; 
+                    case 38: //up -> Horizontal axis 
+                        hor = hor + step;
                         break;
-                    case 38: //up
-                        debuglog("up")
-                        y = y + 1;
+                    case 39: //right -> Vertical axis 
+                        ver = ver - step;
                         break;
-                    case 39: //right
-                        x = x + 1;
-                        debuglog("right")
-                        break;
-                    case 40: //down
-                        y = y - 1;
-                        debuglog("down")
+                    case 40: //down -> Horizontal axis 
+                        hor = hor - step;
                         break;
                         
                 }
+
                 if(wsConnected){
-                    wsSend("4:" + x + "," + y + ",12")
+                    wsSend("3:" + hor + "," + ver + ",50")
                 }
             }
 
-        //#############  onsite scripts  #############
+            
+            //#############  onsite scripts  #############
 
-        //TODO - KEYCODE DEPRECATED replace with event.key!
             //Showing index- or setupPage
             function show(shown, hidden) {
                 document.getElementById(shown).style.display='block';
@@ -558,7 +603,10 @@ R"=====(
                 return false;
             } 
             
-            //catching keyboard input event
+            //Eventlistener
+            window.addEventListener("load", wsStart, false)
+
+            //Keyboard
             document.addEventListener('keydown', function(event) {
                 keyPressed(event.keyCode)
             });
@@ -570,17 +618,24 @@ R"=====(
             //catching keyButton events
             function keyPressed(keyCode){
                 var keyspan = document.getElementById("keyCode")
+                
+
                 if(keyCode == 37) {
                     keyspan.textContent="Key pressed: Left";
+                    document.getElementById("arrowLeft").style = "background-color: #3498db"
+
                 }
-                else if(keyCode == 38) {
+                if(keyCode == 38) {
                     keyspan.textContent="Key pressed: Up";
+                    document.getElementById("arrowUp").style = "background-color: #3498db"
                 }
-                else if(keyCode == 39) {
+                if(keyCode == 39) {
                     keyspan.textContent="Key pressed: Right";
+                    document.getElementById("arrowRight").style = "background-color: #3498db"
                 }
-                else if(keyCode == 40) {
+                if(keyCode == 40) {
                     keyspan.textContent="Key pressed: Down";
+                    document.getElementById("arrowDown").style = "background-color: #3498db"
                 }
                 if (keyCode >= 37 && keyCode <= 40) requestRotate(keyCode);
                 
@@ -589,19 +644,64 @@ R"=====(
             function keyReleased(){
                 keyspan = document.getElementById("keyCode");
                 keyspan.textContent="Key pressed:";
+                document.getElementById("arrowLeft").style = "background-color: beige"
+                document.getElementById("arrowUp").style = "background-color: beige"
+                document.getElementById("arrowRight").style = "background-color: beige"
+                document.getElementById("arrowDown").style = "background-color: beige"
             }
 
-            //listbox events
-            const lb = document.getElementById("listBox");
-            const favPosBox = document.getElementById("favPosBox");
+            //Network listbox events
+            const networkListBox = document.getElementById("listBox");
 
-            lb.onclick = (event) =>{
+            networkListBox.onclick = (event) =>{
                 ssid.value = lb.value;
             }
 
+
+            //favPos listbox events
+            const favPosListBox = document.getElementById("favPosBox");
+            const keyValuePairs = new Array();
+
+
+            //favBox functions
+            const favBoxMap = new Map();
+            function updateFavBox(){ 
+                //clear Listbox
+                favPosListBox.innerHTML = "";
+                keyValuePairs.forEach((element, index) =>{
+                    favPosListBox.options[index] = new Option(element);
+                });
+                debuglog(favBoxMap.size() + " items updated");
+
+
+               
+            }
+
+            //update
+            function updateFavBoxMap(data){
+                //format 2,2,[name=x|y],[name=x|y],...
+                //format 0,1,2         ,3         ,...
+                var pairs = new Array();
+
+                for (i = 2; i < pairs.length(); i++){ //get every data entry
+                    pairs[i-2] = data[i]; 
+                }
+
+                var name, position;
+                pairs.forEach((element, index) => {
+                    name = element.split('|')[0];
+                    position = element.split('|')[1];
+                    favBoxMap.set(name, position);
+                    debuglog(name + "-> " + favBoxMap.get(name));
+                });
+                updateFavBox();
+            }
+
+
+
             //show password checkbox
-            const passBox = document.getElementById("checkbox")
-            const passwordInput = document.getElementById("password")
+            const passBox = document.getElementById("checkbox");
+            const passwordInput = document.getElementById("password");
 
             passBox.onclick = (event) =>{ //show password checkbox
                 if (passwordInput.type === "password"){
@@ -612,17 +712,59 @@ R"=====(
             }
 
         // ------ button scripts ------
-            const restartButton = document.getElementById("restartESP")
 
-            restartButton.onclick = (event) =>{
+            /*
+            EEPROM button format
+            1: EEPROM request Format: 1:dataID,instruction,Key,Value
+            
+                dataID.         0: wifi credentials
+                                1: wifiMeta
+                                2: favPos 
+                                3: factory Reset           
+                instruction:    0: delete
+                                1: store
+                                2: read
+            */
+            const clearWifiButton = document.getElementById("clearWifiButton")
+            clearWifiButton.onclick = (event) =>{
+                var message = "1:0,0"
+                if (wsConnected) wsSend(message)
+                else debuglog("no connection")
+            }
+            
+            const clearStaticIPButton = document.getElementById("clearStaticIPButton")
+            clearStaticIPButton.onclick = (event) =>{
+                var message = "1:1,0,staticIP"
+                if (wsConnected) wsSend(message)
+                else debuglog("no connection")
+            }
+
+            const clearmDNSButton = document.getElementById("clearmDNSButton")
+            clearmDNSButton.onclick = (event) =>{
+                var message = "1:1,0,mDNS"
+                if (wsConnected) wsSend(message)
+                else debuglog("no connection")
+            }
+
+            const factoryResetButton = document.getElementById("factoryResetButton")
+            factoryResetButton.onclick = (event) =>{
+                var message = "1:3"
+                if (wsConnected) wsSend(message)
+                else debuglog("no connection")
+            }
+
+            const restartESPButton = document.getElementById("restartESPButton")
+            restartESPButton.onclick = (event) =>{
                 showToast("Restarting ESP. Please wait!", 4000)
                 wsSend("3:Restart")
             }
             
+
+
             const refreshButton = document.getElementById("refreshButton")
             refreshButton.onclick = (event) =>{
                 if (wsConnected){
-                    wsSend("0") //refresh networks request
+                    wsSend("0:refresh_Network_Pos") //refresh networks request
                     showLoader(true)
                 } else{
                     wsStart()
@@ -631,9 +773,10 @@ R"=====(
 
             const submitButtonMeta = document.getElementById("submitButtonMeta")
             submitButtonMeta.onclick = (event) =>{
-                //if (wsConnected){
+                console.log("META")
+                if (wsConnected){
                     sendWifiMeta()
-                //} 
+                } 
             }
 
             const submitButtonWifi = document.getElementById("submitButtonWiFi")
@@ -644,27 +787,39 @@ R"=====(
                 showLoader(true)
             }  
 
-            const resetEEPROMButton = document.getElementById("resetEEPROM")
-            resetEEPROMButton.onclick = (event) =>{
-                if (wsConnected) {
-                    wsSend("2:Reset EEPROM")
-                }
-            }
-
             const rotateToButton = document.getElementById("rotateTo")
             rotateToButton.onclick = (event) => {
                 requestRotate(-1)
             }
 
+            const setZeroButton = document.getElementById("setZeroButton")
+            setZeroButton.onclick = (event) => {
+                if (wsConnected){
+                    var message = "4:1,";
+                    wsSend(message);
+                }
+            }
+
             const favPosButton = document.getElementById("rotateFavPosButton")
             favPosButton.onclick = (event) => {
                 //request coordinates for fav Pos
-                var posName = favPosBox.value
-                if (posName != null)
-                wsSend("6:" + posName)
+                var name = favPosListBox.value;
+                var positions = favBoxMap.get(name);
+                var x = parseFloat(positions.split('|')[0]);
+                var y = parseFloat(positions.split('|')[1]);
+                posx.value = x;
+                posy.value = y;
             }
 
+            const addFavPosButton = document.getElementById("addFavPosButton")
+            addFavPosButton.onclick = (event) => {
 
+            }
+            
+            const removeFavPosButton = document.getElementById("removeFavPosButton")
+            removeFavPosButton.onclick = (event) => {
+            }
+            
         </script>
     </body>    
 </html>

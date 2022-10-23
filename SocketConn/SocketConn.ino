@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
+#include <nvs_flash.h>
 #include "webpage.h"
 #include "StepperMaster.h"
 #include "Gimbal.h"
@@ -10,26 +11,25 @@
 #define stepperTimeout 4000
 
 //AP SSID and Pass
-const char *ssid = "ESP32 Setup";
-const char *password = "ESP32Setup";
+const char *APssid = "ESP32 Setup";
+const char *APpassword = "ESP32Setup";
 
 
 //dns setup
 const int dns_port = 53;
 const int http_port = 80;
 const int ws_port = 1337;
-int stamp;
 
 
 //Webserver init
 AsyncWebServer server(http_port);
 WebSocketsServer webSocket = WebSocketsServer(ws_port);
 
+
 //Create EEPROM namespace objects
 Preferences credentials;
 Preferences wifiMeta;
 Preferences favPos;
-char msg_buf(40);
 int credentialCounter;
 
 
@@ -37,63 +37,33 @@ int credentialCounter;
 StepperMaster stepperOne(16, 17, 18, 19);  //Horizontal axis
 StepperMaster stepperTwo(27, 26, 25, 33);  //Vertical axis
 Gimbal gimbal(&stepperOne, &stepperTwo, 900);
+int stamp;
 
-
-void gimbalTest() {
-  gimbal.rotateTo(-20, 20, 30);
-  gimbal.rotateTo(20, 20, 30);
-  gimbal.rotateTo(20, -20, 30);
-  gimbal.rotateTo(0, -20, 30);
-  gimbal.rotateTo(0, 0, 30);
-  stepperOne.disable();
-  stepperTwo.disable();
-}
 
 /*########################## FUNCTIONS ##############################*/
 
-//mDNS
-void initmDNS() {
-  String dnsName;
-  if (wifiMeta.getString("mDNS")) dnsName = wifiMeta.getString("mDNS");
-  else dnsName = "cam";  //default Name if nothing is stored
-
-  if (MDNS.begin(dnsName.c_str())) {
-    Serial.print("mDNS hostet under http://");
-    Serial.print(dnsName);
-    Serial.println(".local");
-
-  } else {
-    while (1) {
-      Serial.println("Error setting up MDNS responder");
-      delay(1000);
-    }
-  }
+//########## Web Server Handling ##########
+//Callback send homepage
+void onIndexRequest(AsyncWebServerRequest *request) {
+  IPAddress remote_ip = request->client()->remoteIP();
+  Serial.print("HTTP GET request from [");
+  Serial.print(remote_ip.toString());
+  Serial.print("]: ");
+  Serial.println(request->url());
+  request->send(200, "text/html", webpageCode);
 }
 
-//WiFi scan
-String scanWifi() {
-  String result;
-  //Serial.println("scan start");
-
-  // WiFi.scanNetworks will return the number of networks found
-  int n = WiFi.scanNetworks();
-  //Serial.println("scan done");
-  if (n == 0) {
-    result = "";
-  } else {
-    for (int i = 0; i < n; ++i) {
-      // Print SSID and RSSI for each network found
-      result += WiFi.SSID(i);
-      if (i != n - 1) result += ",";
-      delay(10);
-    }
-  }
-  return result;
+//Callback not found
+void onPageNotFound(AsyncWebServerRequest *request) {
+  IPAddress remote_ip = request->client()->remoteIP();
+  Serial.print("[");
+  Serial.print(String(remote_ip));
+  Serial.print("] HTTP GET request of ");
+  Serial.println(request->url());
+  request->send(404, "text/plan", "Page not found!\n    404");
 }
-
 
 //########## WebSocket Handling ##########
-// Callback: recieving ws message
 void onWebSocketEvent(uint8_t client_num, WStype_t type, uint8_t *payload, size_t length) {
 
   String cmdRaw;
@@ -136,43 +106,28 @@ void onWebSocketEvent(uint8_t client_num, WStype_t type, uint8_t *payload, size_
       break;
     default:
       Serial.print("Unknown WS_TYPE: ");
-      Serial.println(String(type));
+      Serial.println(WStype_t(type));
       break;
   }
 }
 
-//Callback send homepage
-void onIndexRequest(AsyncWebServerRequest *request) {
-  IPAddress remote_ip = request->client()->remoteIP();
-  Serial.print("[");
-  Serial.print(String(remote_ip));
-  Serial.print("] HTTP GET request of ");
-  Serial.println(request->url());
-  request->send(200, "text/html", webpageCode);
-}
-
-//Callback not found
-void onPageNotFound(AsyncWebServerRequest *request) {
-  IPAddress remote_ip = request->client()->remoteIP();
-  Serial.print("[");
-  Serial.print(String(remote_ip));
-  Serial.print("] HTTP GET request of ");
-  Serial.println(request->url());
-  request->send(404, "text/plan", "Page not found!\n    404");
-}
-
-//Respond function
-/*Protocol cmdset:
-  0: recieve available wifi networks
-  1: store ssid and pass
-  2: clear EEPROM
-  3: reboot ESP
-  4: rotate cam
-  5: get stepper position
-  6: send Wifi mDNS and static ip
-  7: get fav pos coords
-*/
 void respond(byte *payload, int length, uint8_t client_num) {
+  /*
+  
+  Protcol format: cmd:[val],[val],....
+  Protocol cmdset:
+  0: send available WiFi networks
+  1: EEPROM Request
+  2: reboot ESP
+  3: rotate cam
+  4: get/set stepper position
+  5: send available saved Positions
+
+  */
+
+
+
+
   char cmd = payload[0];
   String data;
   for (int i = 2; i < length; i++) {  //cmd+":" --> [0, 1, data, data, ...]
@@ -181,120 +136,207 @@ void respond(byte *payload, int length, uint8_t client_num) {
   Serial.print("payload: ");
   Serial.println(data);
 
-  //Rework data Extraction!
   String response;
-  String px;
-  String py;
-  String vel;
-  String wsSSID;
-  String wsPASS;
-  String ip;
-  String mDNS;
   int count = 0;
-  int index;
 
   Serial.print("Command: ");
   Serial.print(cmd);
-  switch (cmd) {
-    case '0':  //Return wifi Signals in Range
-      Serial.println(" (return wifi signals)");
-      response = "0:";
-      response += scanWifi();
-      webSocket.sendTXT(client_num, response);
-      //Serial.println(response);
-      break;
 
-    case '1':  //Store incoming SSID and password
-      {
-        Serial.println(" (Store ssid and password)");
-        storeCreds(data);
-        webSocket.sendTXT(client_num, "1:credentials_stored");
-        //Serial.print("SSID: "); Serial.print(wsSSID); Serial.print(", pass: "); Serial.println(wsPASS);
-      }
-      break;
+  //Return wifi Signals in Range
+  if (cmd == '0') {
+    Serial.println(" (return wifi signals)");
+    response = "0:";
+    response += scanWifi();
+    webSocket.sendTXT(client_num, response);
+    //Serial.println(response);
 
-    case '2':  //clear stored wifi credentials
-      Serial.println(" (clear stored wifi credentials)");
-      credentials.clear();
-      credentials.putUInt("counter", 0);
-      response = "2:credentials_cleared";
-      webSocket.sendTXT(client_num, response);
-      break;
+    
 
-    case '3':
-      Serial.println(" (Restart ESP)");
-      webSocket.sendTXT(client_num, "3:Restarting");
-      ESP.restart();
-      break;
+    //EEPROM request
+  } else if (cmd == '1') {
+    //1: EEPROM request Format: 1:dataID,instruction,Key,Value
+    /*
+          dataID.         0: wifi credentials
+                          1: wifiMeta
+                          2: favPos            
+          instruction:    0: delete
+                          1: store
+                          2: read
+      */
+    Serial.println(" (EEPROM Action)");
+    response = "1:";
+    response += eepromAction(data);
 
-    case '4':
-      //4:posX,posY,Speed
-      stamp = millis();
-      Serial.println(" (rotate camera)");
-      py = splitString(data, ',', 0);
-      px = splitString(data, ',', 1);
-      vel = splitString(data, ',', 2);
+    webSocket.sendTXT(client_num, "1:credentials_stored");
+
+    //Restart ESP
+  } else if (cmd == '2') {
+    Serial.println(" (Restart ESP)");
+    webSocket.sendTXT(client_num, "3:Restarting");
+    ESP.restart();
+
+    //Rotate camera
+  } else if (cmd == '3') {
+    //3:horAx,vertAx,Speed
+    //3:posX,posY,Speed
+    stamp = millis();
+    Serial.println(" (rotate camera)");
+    String hor = splitString(data, ',', 0);
+    String ver = splitString(data, ',', 1);
+    String vel = splitString(data, ',', 2);
+    Serial.print("hor: ");
+    Serial.println(hor);
+    Serial.print("ver: ");
+    Serial.println(ver);
+    Serial.print("vel: ");
+    Serial.println(vel);
 
 
-      gimbal.rotateTo(py.toFloat(), px.toFloat(), vel.toFloat());
-      response = "4:";
-      response += stepperOne.getAbsoluteAngle();  //get vertical axis Value (x)
-      response += ",";
-      response += stepperTwo.getAbsoluteAngle();  //get horizontal axis Value (y)
-      webSocket.broadcastTXT(response);
+    gimbal.rotateTo(hor.toFloat(), ver.toFloat(), vel.toFloat());
+    response = "3:";
+    response += stepperOne.getAbsoluteAngle();  //get horizonzal axis Value (x)
+    response += ",";
+    response += stepperTwo.getAbsoluteAngle();  //get vertical axis Value (y)
+    webSocket.broadcastTXT(response);
 
-      break;
-    case '5':
+    //get/set stepper Pos
+  } else if (cmd == '4') {
+    //4:get/set, x, y
+    String getSet = splitString(data, ',', 0);  //get = 0, set = 1
+    String hor = splitString(data, ',', 1);
+    String ver = splitString(data, ',', 2);
+
+    if (getSet == "0") {  //get
       Serial.println(" (return stepper positions)");
-      response = "5:";
-      response += stepperTwo.getAbsoluteAngle();  //get horizontal axis Value (x)
-      response += ",";
-      response += stepperOne.getAbsoluteAngle();  //get vertical axis Value (y)
-      webSocket.sendTXT(client_num, response);
-      break;
-    case '6':
-      Serial.println(" (store static IP and mDNS name)");
-      storeWifiMeta(data);
-      response = "6:wifiMeta_stored";
-      webSocket.sendTXT(client_num, response);
-      break;
-    case '7':
-      break;
-    default:  //command could not be recognized
-      Serial.println("(Unknown command!)");
-      webSocket.sendTXT(client_num, "100:Unkown Command");
-      break;
+    } else if (getSet == "1") {  //set
+      Serial.println(" (setting stepper positions)");
+      if (hor == "") hor = "0";
+      if (ver == "") ver = "0";
+      stepperOne.setAbsoluteAngle(hor.toFloat());
+      stepperTwo.setAbsoluteAngle(ver.toFloat());
+    }
+
+    response = "4:";
+    response += stepperOne.getAbsoluteAngle();  //get horizontal axis Value (x)
+    response += ",";
+    response += stepperTwo.getAbsoluteAngle();  //get vertical axis Value (y)
+    webSocket.sendTXT(client_num, response);
+  }else if(cmd == '5'){
+    response = "5:";
+    response += getAllFavPos();
+  } else {
+    Serial.println("(Unknown command!)");
+    webSocket.sendTXT(client_num, "100:Unkown Command");
   }
 }
 
-//EEPROM store functions
-bool storeCreds(String payload) {  //Format: ssid,pass
-  String ssid = splitString(payload, ',', 0);
-  String pass = splitString(payload, ',', 1);
+//########## EEPROM Handling ########## ///EEPROM WILL BE REPLACE WITH ESP32 SPIFFS
+String eepromAction(String ws_payload) {
 
-  credentials.putString("ssid", ssid.c_str());
-  credentials.putString("pass", pass.c_str());
-  int temp = credentials.getUInt("counter") + 1;
-  credentials.putUInt("counter", temp);
+  /*
+  dataID.         0: wifi credentials
+                  1: wifiMeta
+                  2: favPos 
+                  3: factory Reset           
+  instruction:    0: delete
+                  1: store
+                  2: read
+  */
+
+
+  String dataID = splitString(ws_payload, ',', 0);
+  String instruction = splitString(ws_payload, ',', 1);
+  String key = splitString(ws_payload, ',', 2);
+
+  String returnVal = "";
+
+  Serial.println("---");
+  Serial.print("dataID: ");
+  Serial.println(dataID);
+  Serial.print("instruction: ");
+  Serial.println(instruction);
+
+
+  Preferences eeprom;
+  if (dataID == "0") {
+    eeprom.begin("Credentials");
+    if (instruction == "0") {
+      eeprom.clear();
+      Serial.println("Deleting creds");
+    } else if (instruction == "1") storeCreds(ws_payload, &eeprom);
+    else if (instruction == "2") eeprom.getString(key.c_str());
+    else returnVal = "";
+
+  } else if (dataID == "1") {
+    eeprom.begin("wifiMeta");
+    if (instruction == "0") eeprom.remove(key.c_str());
+    else if (instruction == "1") storeWifiMeta(ws_payload, &eeprom);
+    else if (instruction == "2") eeprom.getString(key.c_str());
+    else returnVal = "";
+
+  } else if (dataID == "2") {
+    eeprom.begin("FavPos");
+    if (instruction == 0) eeprom.remove(key.c_str());
+    else if (instruction == "1") returnVal = storePosition(ws_payload, &eeprom);
+    else if (instruction == "2") eeprom.getString(key.c_str());
+    else returnVal = "";
+
+  } else if (dataID == "3") {
+    nvs_flash_erase();  // erase the NVS partition and
+    nvs_flash_init();   // initialize the NVS partition.
+    initEEPROM();       //Create all namespaces
+
+  } else {
+  }
+
+
+
+  return returnVal;
 }
 
-bool storePosition(String payload) {
-  String name = splitString(payload, ',', 0);
-  String posX = splitString(payload, ',', 1);
-  String posY = splitString(payload, ',', 2);
+bool storeCreds(String payload, Preferences *pref) {  //index ssid=2, pass=3
+  String ssid = splitString(payload, ',', 2);
+  String pass = splitString(payload, ',', 3);
+
+  Serial.print("ssid: ");
+  Serial.println(ssid);
+  Serial.print("pass: ");
+  Serial.println(pass);
+
+
+  pref->putString("ssid", ssid.c_str());
+  pref->putString("pass", pass.c_str());
+  int temp = pref->getUInt("counter") + 1;
+  pref->putUInt("counter", temp);
+  Serial.println("Creds stored!");
+}
+
+bool storePosition(String payload, Preferences *pref) {
+  String name = splitString(payload, ',', 2);
+  String posX = splitString(payload, ',', 3);
+  String posY = splitString(payload, ',', 4);
+
+  if (pref->getString(name.c_str()) == "") return false;
+
 
   String val = String(posX);
   val += ":";
   val += String(posY);
-  favPos.putString(name.c_str(), val);
+  pref->putString(name.c_str(), val);
+  return true;
 }
 
-bool storeWifiMeta(String payload) {  //webhost checks IP validity (javascript Regex)
-  String staticIP = splitString(payload, ',', 0);
-  String mDNS = splitString(payload, ',', 1);
+bool storeWifiMeta(String payload, Preferences *pref) {  //webhost checks IP validity (javascript Regex)
+  String staticIP = splitString(payload, ',', 2);
+  String mDNS = splitString(payload, ',', 3);
 
-  wifiMeta.putString("staticIP", staticIP);
-  wifiMeta.putString("mDNS", mDNS);
+  Serial.print("IP: ");
+  Serial.println(staticIP);
+  Serial.print("mDNS: ");
+  Serial.println(mDNS);
+
+  if (staticIP != "") pref->putString("staticIP", staticIP);
+  if (mDNS != "") pref->putString("mDNS", mDNS);
 }
 
 void showEEPROM() {
@@ -334,126 +376,11 @@ void showEEPROM() {
   }
 
   //list saved Positions
+  getAllFavPos();
   Serial.println("-----------------");
 }
 
-void stepperTimeoutCheck() {
-  if (stamp + stepperTimeout <= millis()) {
-    stepperOne.disable();
-    stepperTwo.disable();
-  }
-}
-
-String splitString(String data, char separator, int index) {
-  int found = 0;
-  int strIndex[] = { 0, -1 };
-  int maxIndex = data.length() - 1;
-
-  for (int i = 0; i <= maxIndex && found <= index; i++) {
-    if (data.charAt(i) == separator || i == maxIndex) {
-      found++;
-      strIndex[0] = strIndex[1] + 1;
-      strIndex[1] = (i == maxIndex) ? i + 1 : i;
-    }
-  }
-
-  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
-}
-
-
-
-bool staticIPSetup() {
-
-
-  // Default
-  IPAddress gateway;
-
-  IPAddress subnet;
-  IPAddress primaryDNS;    // optional
-  IPAddress secondaryDNS;  // optional
-
-  String eepromSSID = credentials.getString("ssid");
-  String eepromPASS = credentials.getString("pass");
-
-  Serial.println("Fetching WiFi data to setup static IP...");
-  delay(50);
-
-
-  //Serial.print("Subnet Mask: ");
-  subnet = WiFi.subnetMask();
-  //Serial.println(subnet);
-
-  //Serial.print("Gateway IP: ");
-  gateway = WiFi.gatewayIP();
-  //Serial.println(gateway);
-
-  //Serial.print("DNS 1: ");
-  primaryDNS = WiFi.dnsIP(0);
-  //Serial.println(primaryDNS);
-
-  //Serial.print("DNS 2: ");
-  secondaryDNS = WiFi.dnsIP(2);
-  //Serial.println(secondaryDNS);
-
-
-  //construc staticIP from EEPROM
-  String IP = wifiMeta.getString("staticIP");
-  int ip_number[4];
-
-  for (int i = 0; i < 4; i++) {
-    String temp = splitString(IP, '.', i);
-    ip_number[i] = temp.toInt();
-  }
-  IPAddress local_IP(ip_number[0], ip_number[1], ip_number[2], ip_number[3]);
-
-  //Restart WiFi with static ip
-  WiFi.disconnect();
-  delay(200);
-  WiFi.mode(WIFI_STA);
-  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
-    Serial.println("STA Failed to configure");
-  }
-  delay(500);
-  WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str());  //conenct to WiFi with static IP
-  while (WiFi.status() != WL_CONNECTED) {
-
-
-    //Serial.println(WiFi.status());
-  }
-
-  return true;
-}
-
-//connecting to wifi with timeout
-void tryWifi() {
-
-  Serial.println("Connecting...");
-  String eepromSSID;
-  String eepromPASS;
-  int wifiTimeoutLimit = 10;  //timeout in seconds
-  for (int i = 0; i < credentialCounter; i++) {
-
-    if (WiFi.status() != WL_CONNECTED) {
-      eepromSSID = credentials.getString("ssid");
-      eepromPASS = credentials.getString("pass");
-      WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str());  //start with dynamic IP
-
-      int timeStamp = millis() + wifiTimeoutLimit * 1000;
-      while ((WiFi.status() != WL_CONNECTED) && (timeStamp >= millis())) {
-        // Serial.print(WiFi.status()); Serial.print(": "); Serial.print(timeStamp); Serial.print(" >= "); Serial.println(millis());
-        //Serial.println(WiFi.status());//Serial.print(" .");
-      }
-    }
-
-    //set up static IP
-    staticIPSetup();
-  }
-}
-
-//----------------------------------- µ-Controller loop -----------------------------------
-void setup() {
-  Serial.begin(115200);
-
+void initEEPROM() {
   //Setup EEPROM | creating namespaces if they dont exist
   //Create Wifi Namespace
   credentials.begin("Credentials", false);
@@ -461,30 +388,234 @@ void setup() {
   wifiMeta.begin("wifiMeta", false);
   //Create position Namespace
   favPos.begin("FavPositions", false);
-  showEEPROM();
-  if (credentialCounter > 0) {
-    tryWifi();
-  }
+}
 
-  //if there is no working wifi start AP
-  if (WiFi.status() != WL_CONNECTED) {
-    if (!WiFi.softAP(ssid, password)) {
-      while (true) {
-        if ((millis() / 1000) % 2 == 0) Serial.println("SoftAP failiure!");
+String getAllFavPos(){
+  String returnVal = "";
+  int entryCount = (sizeof(favPos)/sizeof(String))/* - favPos.freeEntries()*/;
+  Serial.print(entryCount); Serial.println(" saved positions found!");
+  for (int i = 0; i < entryCount; i++){
+    returnVal;
+  }
+}
+
+//########## WiFi Handling ##########
+bool wifiSetup(int wifiTimeout) {  //timeout in sec
+                                   //connecting to wifi with timeout
+  bool returnVal = false;
+
+  Serial.println("Starting Wifi setup");
+  String eepromSSID = credentials.getString("ssid");
+  String eepromPASS = credentials.getString("pass");
+
+  bool staticIP = false;
+  //Check if wifi credentials are saved on EEPROM
+  if (credentialCounter > 0) {
+    Serial.println("Connecting...");
+    //set up static IP if necessary
+    staticIP = staticIPSetup();
+
+    //try every saved wifi (currently only one supported)
+    //Setup WiFi with dynamic IP if static failed
+    if (WiFi.status() != WL_CONNECTED) {
+      for (int i = 0; i < credentialCounter; i++) {
+
+        WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str());
+        int timeStamp = millis() + wifiTimeout * 1000;
+        while (((WiFi.status() != WL_CONNECTED) && (timeStamp >= millis()))) {}
       }
     }
-    delay(2000);
-    Serial.print("AP running at ");
+  }
+  //Setup wifi as Access Point
+  if (WiFi.status() != WL_CONNECTED) {
+    setupAP();
+    Serial.print("ESP started network '");
+    Serial.print(APssid);
+    Serial.print("'. Connect via ");
     Serial.println(WiFi.softAPIP());
   } else {
     Serial.print("ESP connected to ");
     Serial.print(WiFi.SSID());
-    Serial.print(" running on ");
+    Serial.print(" with ");
+    if (staticIP) Serial.print("static IP ");
+    else Serial.print("dynamic IP ");
     Serial.println(WiFi.localIP());
+    initmDNS();
   }
 
-  //setting up DNS Name to connect
-  initmDNS();
+
+  return true;
+}
+
+bool staticIPSetup() {
+  bool returnVal = false;
+
+  String IP = wifiMeta.getString("staticIP");
+  if (IP != "") {
+    // Default
+    IPAddress gateway;
+
+    IPAddress subnet;
+    IPAddress primaryDNS;    // optional
+    IPAddress secondaryDNS;  // optional
+    String eepromSSID = credentials.getString("ssid");
+    String eepromPASS = credentials.getString("pass");
+
+
+    //Try to connect with dynamic ip to WIFI to get Router information
+    Serial.println("Fetching WiFi data to setup static IP:");
+
+    if (WiFi.begin(eepromSSID.c_str(), eepromPASS.c_str())) {
+      while (WiFi.status() != WL_CONNECTED) {};  //Wait for Connection
+      if (WiFi.status() == WL_CONNECTED) {
+
+        Serial.print("Subnet Mask: ");
+        subnet = WiFi.subnetMask();
+        Serial.println(subnet);
+
+        Serial.print("Gateway IP: ");
+        gateway = WiFi.gatewayIP();
+        Serial.println(gateway);
+
+        Serial.print("DNS 1: ");
+        primaryDNS = WiFi.dnsIP(0);
+        Serial.println(primaryDNS);
+
+        Serial.print("DNS 2: ");
+        secondaryDNS = WiFi.dnsIP(2);
+        Serial.println(secondaryDNS);
+
+
+        //construct staticIP from EEPROM
+        int ip_number[4];
+
+        for (int i = 0; i < 4; i++) {
+          String temp = splitString(IP, '.', i);
+          ip_number[i] = temp.toInt();
+        }
+        Serial.print("StaticIP: ");
+        Serial.print(ip_number[0]);
+        Serial.print(".");
+        Serial.print(ip_number[1]);
+        Serial.print(".");
+        Serial.print(ip_number[2]);
+        Serial.print(".");
+        Serial.println(ip_number[3]);
+        IPAddress local_IP(ip_number[0], ip_number[1], ip_number[2], ip_number[3]);
+        returnVal = true;
+
+        //setup staticIP
+        WiFi.mode(WIFI_STA);
+        if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+          Serial.println("Failed to configure STA WiFi!");
+          returnVal = false;
+        }
+      }
+    }
+  }
+  return returnVal;
+}
+
+void setupAP() {
+  //Start wifi as acces point if no network is reachable
+
+  if (!WiFi.softAP(APssid, APpassword)) {
+    Serial.println("SoftAP failiure!\nNo nonnection possible!");
+    while (true) {}
+    //Network connection failed and access Point failed
+    //ESP is unusable without connection
+    //Programm stalls
+  }
+}
+
+//Create mDNS name in local network
+void initmDNS() {
+  String dnsName = wifiMeta.getString("mDNS");
+  if (dnsName == "") dnsName = "cam";  //default Name if nothing is stored
+
+  if (MDNS.begin(dnsName.c_str())) {
+    Serial.print("ESP reachable under http://");
+    Serial.print(dnsName);
+    Serial.println(".local");
+
+  } else {
+    Serial.println("Error setting up MDNS responder");
+  }
+}
+
+//Scan for visible networks
+String scanWifi() {
+  String result;
+  //Serial.println("scan start");
+
+  // WiFi.scanNetworks will return the number of networks found
+  int n = WiFi.scanNetworks();
+  //Serial.println("scan done");
+  if (n == 0) {
+    result = "";
+  } else {
+    for (int i = 0; i < n; ++i) {
+      // Print SSID and RSSI for each network found
+      result += WiFi.SSID(i);
+      if (i != n - 1) result += ",";
+    }
+  }
+  return result;
+}
+
+//########## Utility functions ##########
+String splitString(String data, char separator, int index) {
+  bool found = false;
+  int runningIndex = 0;
+  String chopped = "";
+
+  for (int i = 0; (i < data.length()) && (!found); i++) {
+    char currChar = data.charAt(i);
+
+    if (currChar == separator || i == data.length()) {  //catch EOL
+      if (runningIndex >= index) {
+        found = true;
+      } else {
+        runningIndex++;
+        chopped = "";
+      }
+    } else {
+      chopped += currChar;
+    }
+  }
+  return chopped;
+}
+
+void gimbalTest() {
+  gimbal.rotateTo(-20, 20, 30);
+  gimbal.rotateTo(20, 20, 30);
+  gimbal.rotateTo(20, -20, 30);
+  gimbal.rotateTo(0, -20, 30);
+  gimbal.rotateTo(0, 0, 30);
+  stepperOne.disable();
+  stepperTwo.disable();
+}
+
+void stepperTimeoutCheck() {
+  int stamp = 0;
+  if (stamp + stepperTimeout <= millis()) {
+    stepperOne.disable();
+    stepperTwo.disable();
+  }
+}
+
+//----------------------------------- µ-Controller loop -----------------------------------
+void setup() {
+  int stamp = millis();
+  Serial.begin(115200);
+  Serial.println("Booting ESP...");
+  gimbal.returnToHome();
+
+  initEEPROM();
+  showEEPROM();
+
+  //start wifi either AP or via network
+  wifiSetup(10);
 
   Serial.println("Webhost ready");
 
@@ -495,6 +626,9 @@ void setup() {
   server.begin();
   webSocket.begin();
   webSocket.onEvent(onWebSocketEvent);
+  Serial.print("(");
+  Serial.print(millis() - stamp);
+  Serial.println("ms)\n");
   Serial.println("------------ Protocol Log Start ------------");
 }
 
