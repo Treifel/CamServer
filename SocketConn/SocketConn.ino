@@ -150,7 +150,7 @@ void respond(byte *payload, int length, uint8_t client_num) {
     webSocket.sendTXT(client_num, response);
     //Serial.println(response);
 
-    
+
 
     //EEPROM request
   } else if (cmd == '1') {
@@ -221,7 +221,7 @@ void respond(byte *payload, int length, uint8_t client_num) {
     response += ",";
     response += stepperTwo.getAbsoluteAngle();  //get vertical axis Value (y)
     webSocket.sendTXT(client_num, response);
-  }else if(cmd == '5'){
+  } else if (cmd == '5') {
     response = "5:";
     response += getAllFavPos();
   } else {
@@ -294,7 +294,7 @@ String eepromAction(String ws_payload) {
   return returnVal;
 }
 
-bool storeCreds(String payload, Preferences *pref) {  //index ssid=2, pass=3
+void  storeCreds(String payload, Preferences *pref) {  //index ssid=2, pass=3
   String ssid = splitString(payload, ',', 2);
   String pass = splitString(payload, ',', 3);
 
@@ -376,7 +376,7 @@ void showEEPROM() {
   }
 
   //list saved Positions
-  getAllFavPos();
+  //getAllFavPos();
   Serial.println("-----------------");
 }
 
@@ -390,11 +390,12 @@ void initEEPROM() {
   favPos.begin("FavPositions", false);
 }
 
-String getAllFavPos(){
+String getAllFavPos() {
   String returnVal = "";
-  int entryCount = (sizeof(favPos)/sizeof(String))/* - favPos.freeEntries()*/;
-  Serial.print(entryCount); Serial.println(" saved positions found!");
-  for (int i = 0; i < entryCount; i++){
+  int entryCount = (sizeof(favPos) / sizeof(String)) /* - favPos.freeEntries()*/;
+  Serial.print(entryCount);
+  Serial.println(" saved positions found!");
+  for (int i = 0; i < entryCount; i++) {
     returnVal;
   }
 }
@@ -545,6 +546,7 @@ void initmDNS() {
 
 //Scan for visible networks
 String scanWifi() {
+  int stamp = millis();
   String result;
   //Serial.println("scan start");
 
@@ -555,11 +557,13 @@ String scanWifi() {
     result = "";
   } else {
     for (int i = 0; i < n; ++i) {
-      // Print SSID and RSSI for each network found
+      // Print SSID for each network found
       result += WiFi.SSID(i);
       if (i != n - 1) result += ",";
     }
   }
+  Serial.print("WifiScan time: ");
+  Serial.println(millis() - stamp);
   return result;
 }
 
@@ -609,7 +613,6 @@ void setup() {
   int stamp = millis();
   Serial.begin(115200);
   Serial.println("Booting ESP...");
-  gimbal.returnToHome();
 
   initEEPROM();
   showEEPROM();

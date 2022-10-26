@@ -5,13 +5,21 @@ R"=====(
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>
             ESP32 Device Setup
         </title>
         <!--####################################################  CSS  ####################################################-->
         <style>
             body{
-                font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif
+                font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+            }
+
+            header{
+                width: 960px;
+	            max-width: 100%;
+	            padding: 20px;
+	            margin: 0 auto;
             }
 
             input, label{
@@ -25,14 +33,34 @@ R"=====(
                 min-width: 5em;
             }
 
+            input[type=button], button{
+                border: 1px solid rgb(48, 48, 48);
+                background-color: rgba(233, 250, 254, 0.284);
+                border-radius: 5px;
+                padding: .5em;
+            }
+
+            input[type=button]:hover, button:hover{
+                border: 1px solid black;
+                background-color: beige;
+                cursor: pointer;
+            }
+
+            input[type=button]:active, button:active{
+                border: 1px solid rgb(61, 61, 61);
+                background-color: antiquewhite;
+            }
+
             .rowStyle{
                 display: flex;
+                flex-wrap: wrap;
                 flex-direction: row;
                 justify-content: left;
                 align-items: stretch;
                 gap: 1em;
-                padding: 2px;
-                margin-bottom: 5ex;
+                padding: .3em;
+                max-width: 100%;
+                
                 white-space: nowrap;
             }
             
@@ -41,7 +69,7 @@ R"=====(
                 flex-direction: column;
                 align-items: stretch;
                 justify-content: start;
-                gap: 5px;
+                gap: .2em;
             }
 
             .input{
@@ -117,7 +145,6 @@ R"=====(
             }
 
             .keyButton:hover{
-                background-color: darkgrey;
                 cursor: pointer;
             }
 
@@ -226,7 +253,7 @@ R"=====(
                 </div>
 
                 <div class="columnStyle">
-                    Please enter or select Wifi and add the corresponding password.
+                    Enter wifi credentials
                     <div class="columnStyle">
                         <lable for="ssid"> SSID: </lable> 
                         <input type="text" id="ssid">
@@ -248,7 +275,11 @@ R"=====(
                 <div class="columnStyle">
                     Wifi meta Settings
                     <lable for="staticIP"> Static IP: </lable> 
-                    <input type="text" id="staticIP">
+                    <div class="rowStyle" style="display: inline-block;">
+                        <!--<span style="vertical-align: middle;">192.168.0.</span>-->
+                        <input type="text" id="staticIP">
+                    </div> 
+                    
                     <label for="mDNSname"> mDNS name: </label>
                     <input type="text" id="mDNSname">
                     <button id="submitButtonMeta" style="max-height: 2em; position: relative; height: 50%;" >Submit</button>
@@ -258,7 +289,9 @@ R"=====(
 
 
 
-            <div class="columnStyle" >
+            <div class="columnStyle" style="border: 2px solid darkgrey; border-radius: 4px; max-width: 30em;
+            position: absolute; padding: 1em; margin-top: 1em;">
+                    Reset storage values:
                     <div>
                         <label style="margin: 10px 0;">Clear stored Wifi data:</label>
                         <input type="button" value="Clear" id="clearWifiButton" style="margin: 10px 0;">
@@ -306,7 +339,7 @@ R"=====(
                 <div class="columnStyle">
                     <span id="camControl">Camera control</span>
 
-                    <div class="grid-container-arrowkeys">
+                    <div class="grid-container-arrowkeys" style="margin-bottom: 1em;">
                         <div id="arrowLeft" class="keyButton" onmousedown="keyPressed(37)" onmouseup="keyReleased()"><span>&larr;</span></div>    
                         <div id="arrowUp" class="keyButton" onmousedown="keyPressed(38)" onmouseup="keyReleased()"><span>&uarr;</span></div>    
                         <div id="arrowRight" class="keyButton" onmousedown="keyPressed(39)" onmouseup="keyReleased()"><span>&rarr;</span></div>    
@@ -392,12 +425,12 @@ R"=====(
 
             function wsConnect(url){
                 debuglog("Trying to connect to " + url)
-                var available = true
+                var available = false
                 try{
-                    websocket = new WebSocket(url)
+                    websocket = new WebSocket(url);
+                    available = true;
                 }catch (error){
-                    available = false
-                    debuglog("Websocket failed: " + error)
+                    debuglog("Websocket failed: " + error);
                 }
 
                 //assign callbacks
@@ -430,16 +463,15 @@ R"=====(
                     Protcol format: cmd:[val],[val],....
                     Protocol cmdset:
                     0: recieve available wifi networks and StepperPos
-                    1: EEPROM Request
+                    1: DATA Request 
                     2: reboot ESP
                     3: rotate cam
                     4: get/set stepper position
                 */
-                debuglog("Recieved: " + event.data)
+                debuglog("Recieved: " + evt.data)
                 payload = evt.data.split(":")
                 cmd = payload[0]
                 var type = typeof cmd;
-                debuglog("CMD; type: " + type + ", cmd: " + cmd)
                 content = payload[1]
                 switch(cmd){
                     case "0":             
@@ -448,7 +480,7 @@ R"=====(
                         break;
 
                     case "1":
-                        var data = payload.split(',');
+                        var data = payload.split(",");
                         var dataID = data[0];
                         var instructions = data[1];
                         if ((dataID == 2) && (instructions == 2)){
@@ -494,10 +526,9 @@ R"=====(
 
             //Response Functions
             function updateWifiBox(content){
-                networkListBox = document.getElementById('listBox') 
-                availableNetworks = content.split(",")
-                listboxLength = listbox.length
-                addContent = true
+                var availableNetworks = content.split(",");
+                var listboxLength = networkListBox.length
+                var addContent = true
                 debuglog(availableNetworks + " total of " + availableNetworks.length)
 
                 for (var j = 0; j < availableNetworks.length; j++){
@@ -506,7 +537,7 @@ R"=====(
                     //debuglog("Listbox length: " + listboxLength)
 
                     for (var i = 0; i < listboxLength; i++){
-                        if (listbox.options[i].text == network){ //check if network is already contained in LB
+                        if (networkListBox.options[i].text == network){ //check if network is already contained in LB
                            addContent = false
                            //debuglog(network + " is already in the listbox ")
                         }
@@ -654,7 +685,7 @@ R"=====(
             const networkListBox = document.getElementById("listBox");
 
             networkListBox.onclick = (event) =>{
-                ssid.value = lb.value;
+                ssid.value = networkListBox.value;
             }
 
 
@@ -756,7 +787,7 @@ R"=====(
             const restartESPButton = document.getElementById("restartESPButton")
             restartESPButton.onclick = (event) =>{
                 showToast("Restarting ESP. Please wait!", 4000)
-                wsSend("3:Restart")
+                wsSend("2:Restart")
             }
             
 
@@ -784,7 +815,6 @@ R"=====(
                 if (wsConnected){
                     sendWifiCredentials()
                 } 
-                showLoader(true)
             }  
 
             const rotateToButton = document.getElementById("rotateTo")
@@ -822,5 +852,8 @@ R"=====(
             
         </script>
     </body>    
-</html>
+</html>   #
+698
+
+690802
 )=====";
