@@ -1,8 +1,8 @@
 #include <ESPmDNS.h>
 #include <WiFi.h>
 #include <Preferences.h>
-#include <ESPAsyncWebServer.h>
-#include <WebSocketsServer.h>
+#include <ESPAsyncWebServer.h>  //https://github.com/Links2004/arduinoWebSockets
+#include <WebSocketsServer.h>   //https://github.com/me-no-dev/ESPAsyncWebServer and https://github.com/me-no-dev/ESPAsyncTCP
 #include <nvs_flash.h>
 #include "webpage.h"
 #include "StepperMaster.h"
@@ -294,7 +294,7 @@ String eepromAction(String ws_payload) {
   return returnVal;
 }
 
-void  storeCreds(String payload, Preferences *pref) {  //index ssid=2, pass=3
+void storeCreds(String payload, Preferences *pref) {  //index ssid=2, pass=3
   String ssid = splitString(payload, ',', 2);
   String pass = splitString(payload, ',', 3);
 
@@ -429,6 +429,7 @@ bool wifiSetup(int wifiTimeout) {  //timeout in sec
   }
   //Setup wifi as Access Point
   if (WiFi.status() != WL_CONNECTED) {
+    WiFi.disconnect();  //Close all connections
     setupAP();
     Serial.print("ESP started network '");
     Serial.print(APssid);
@@ -608,6 +609,20 @@ void stepperTimeoutCheck() {
   }
 }
 
+void websocketPing() {
+  static int timestamp = millis();
+  String payload = "PING";
+  size_t length = sizeof(payload) / sizeof(uint8_t);
+
+  int pingTime = 5000;
+
+  if ((millis() - timestamp) >= pingTime) {
+
+    webSocket.broadcastPing(payload);
+    timestamp = millis();
+  }
+}
+
 //----------------------------------- µ-Controller loop -----------------------------------
 void setup() {
   int stamp = millis();
@@ -634,8 +649,6 @@ void setup() {
   Serial.println("ms)\n");
   Serial.println("------------ Protocol Log Start ------------");
 }
-
-
 
 void loop() {
   webSocket.loop();

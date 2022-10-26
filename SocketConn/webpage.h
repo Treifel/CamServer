@@ -366,7 +366,7 @@ R"=====(
 
                     <div class="rowStyle">
                         <span style="min-width: 5em;">Speed:</span> 
-                        <input type="text" id="speed">
+                        <input type="text" id="speed" value="25">
                     </div> 
 
                     <button id="rotateTo">Rotate to</button>
@@ -374,10 +374,6 @@ R"=====(
                     <button id="setZeroButton">Set Zero</button>
                     
                 </div>
-            </div>
-
-            <div class="rowStyle"> 
-                <span id="keyCode"> Key pressed: </span>
             </div>
             
         </div>
@@ -447,8 +443,8 @@ R"=====(
                 debuglog("Connected")
                 wsConnected = true
                 showToast("ESP connection established!", 2000)
-                wsSend("0:connected")
                 wsSend("4:0,"); //get stepper Postion
+                wsSend("0:connected")
             }
 
             function onClose(evt){
@@ -476,7 +472,6 @@ R"=====(
                 switch(cmd){
                     case "0":             
                         updateWifiBox(content)
-                        wsSend("4:StepperPos")
                         break;
 
                     case "1":
@@ -599,9 +594,10 @@ R"=====(
             }
             
             function requestRotate(keyCode){
-                var hor = Math.round(parseFloat(document.getElementById("hor").value, 2))
-                var ver = Math.round(parseFloat(document.getElementById("ver").value, 2))
-                var step = Math.round(parseFloat(document.getElementById("stepInput").value, 2))
+                var hor = Math.round(parseFloat(document.getElementById("hor").value, 2));
+                var ver = Math.round(parseFloat(document.getElementById("ver").value, 2));
+                var step = Math.round(parseFloat(document.getElementById("stepInput").value, 2));
+                var speed = parseInt(document.getElementById("speed").value);
 
                 switch (keyCode){ //key was pressed remove or add amount to Position
                     case 37: //left -> Vertical axis 
@@ -620,7 +616,7 @@ R"=====(
                 }
 
                 if(wsConnected){
-                    wsSend("3:" + hor + "," + ver + ",50")
+                    wsSend("3:" + hor + "," + ver + "," + speed)
                 }
             }
 
@@ -648,24 +644,19 @@ R"=====(
 
             //catching keyButton events
             function keyPressed(keyCode){
-                var keyspan = document.getElementById("keyCode")
                 
 
                 if(keyCode == 37) {
-                    keyspan.textContent="Key pressed: Left";
                     document.getElementById("arrowLeft").style = "background-color: #3498db"
 
                 }
                 if(keyCode == 38) {
-                    keyspan.textContent="Key pressed: Up";
                     document.getElementById("arrowUp").style = "background-color: #3498db"
                 }
                 if(keyCode == 39) {
-                    keyspan.textContent="Key pressed: Right";
                     document.getElementById("arrowRight").style = "background-color: #3498db"
                 }
                 if(keyCode == 40) {
-                    keyspan.textContent="Key pressed: Down";
                     document.getElementById("arrowDown").style = "background-color: #3498db"
                 }
                 if (keyCode >= 37 && keyCode <= 40) requestRotate(keyCode);
@@ -673,8 +664,6 @@ R"=====(
             }
 
             function keyReleased(){
-                keyspan = document.getElementById("keyCode");
-                keyspan.textContent="Key pressed:";
                 document.getElementById("arrowLeft").style = "background-color: beige"
                 document.getElementById("arrowUp").style = "background-color: beige"
                 document.getElementById("arrowRight").style = "background-color: beige"
@@ -852,8 +841,5 @@ R"=====(
             
         </script>
     </body>    
-</html>   #
-698
-
-690802
+</html>
 )=====";
