@@ -2,7 +2,7 @@
 #include <WiFi.h>
 #include <Preferences.h>
 #include <ESPAsyncWebServer.h>  //https://github.com/Links2004/arduinoWebSockets
-#include <WebSocketsServer.h>   //https://github.com/me-no-dev/ESPAsyncWebServer and https://github.com/me-no-dev/ESPAsyncTCP
+#include <WebSocketsServer.h>   //https://github.com/me-no-dev/ESPAsyncWebServer and https://github.com/me-no-dev/AsyncTCP
 #include <nvs_flash.h>
 #include "webpage.h"
 #include "StepperMaster.h"
@@ -33,7 +33,7 @@ Preferences favPos;
 int credentialCounter;
 
 
-//Stepper init
+//Stepper init          IN1, IN2, IN3, IN4
 StepperMaster stepperOne(16, 17, 18, 19);  //Horizontal axis
 StepperMaster stepperTwo(27, 26, 25, 33);  //Vertical axis
 Gimbal gimbal(&stepperOne, &stepperTwo, 900);
